@@ -1,0 +1,763 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import Theme
+import org.qfield
+import org.qgis
+
+Item {
+    id: filterToolRoot // ID interne du composant
+    
+    // Propriétés globales héritées de l'interface
+    property var mainWindow: iface.mainWindow()
+    property var mapCanvas: iface.mapCanvas()
+    property var selectedLayer: null
+    
+    // Récupération de l'objet FeatureForm (formulaire d'attributs)
+    property var featureFormItem: iface.findItemByObjectName("featureForm")
+
+    // État du filtre
+    property bool filterActive: false
+    
+    // Nouvelle propriété pour suivre l'état du formulaire
+    property bool isFormVisible: false
+    
+    // === PERSISTENCE PROPERTIES ===
+    property bool showAllFeatures: false
+    property bool showFeatureList: false 
+    
+    property string savedLayerName: ""
+    property string savedFieldName: ""
+    property string savedFilterText: ""
+
+    // Initialisation
+    Component.onCompleted: {
+        // NOTE: On n'ajoute plus de bouton à la toolbar ici, car c'est main.qml qui gère le bouton.
+        updateLayers()
+        if (featureFormItem) {
+            isFormVisible = featureFormItem.visible
+        }
+    }
+
+    // === FONCTIONS PUBLIQUES APPELÉES PAR MAIN.QML ===
+
+    /* 
+     * Ouvre l'interface de filtrage.
+     * Cette fonction remplace l'ancien onClicked du bouton.
+     */
+    function openFilterUI() {
+        if (!filterActive) {
+            // Reset des champs si pas de filtre actif
+            showAllFeatures = false
+            savedLayerName = ""
+            savedFieldName = ""
+            savedFilterText = ""
+            if(valueField) valueField.text = "" 
+            selectedLayer = null
+        } else {
+            // Restauration du texte si filtre actif
+            if(valueField) valueField.text = savedFilterText
+        }
+        
+        updateLayers()
+        searchDialog.open()
+    }
+
+    /*
+     * Supprime tous les filtres (déjà existant, mais rendu accessible)
+     */
+    function removeAllFilters() {
+        if (selectedLayer) {
+            selectedLayer.subsetString = ""
+            selectedLayer.removeSelection()
+            selectedLayer.triggerRepaint()
+        }
+        if(valueField) {
+            valueField.text = ""
+            valueField.model = []
+        }
+        filterActive = false
+        showAllFeatures = false
+        savedLayerName = ""
+        savedFieldName = ""
+        savedFilterText = ""
+        selectedLayer = null
+        
+        mapCanvas.refresh()
+        updateLayers()
+        updateApplyState()
+        
+        // Petit toast pour confirmer (optionnel, car main.qml gère aussi l'UI)
+        mainWindow.displayToast(tr("Filter deleted"))
+    }
+
+    // === GESTION DES EVENEMENTS DU FORMULAIRE ===
+    Connections {
+        target: featureFormItem
+        
+        function onVisibleChanged() {
+            filterToolRoot.isFormVisible = featureFormItem.visible
+            
+            if (!featureFormItem.visible) {
+                showFeatureList = false 
+                if (filterActive) {
+                    refreshVisualsOnly()
+                }
+            }
+        }
+    }
+
+    /* ========= TRANSLATION LOGIC ========= */
+    function tr(text) {
+        var isFrench = Qt.locale().name.substring(0, 2) === "fr"
+        
+        var dictionary = {
+            "Filter deleted": "Filtre supprimé",
+            "FILTER": "FILTRE",
+            "Select a layer": "Sélectionner une couche",
+            "Select a field": "Sélectionner un champ",
+            "Filter value(s) (separate by ;) :": "Valeur(s) du filtre (séparer par ;) :",
+            "Show all geometries (+filtered)": "Afficher toutes géométries (+filtrées)",
+            "Show feature list": "Afficher liste des entités",
+            "Apply filter": "Appliquer le filtre",
+            "Delete filter": "Supprimer le filtre",
+            "Error fetching values: ": "Erreur récupération valeurs : ",
+            "Error Zoom: ": "Erreur Zoom : ",
+            "Error: ": "Erreur : ",
+            "Searching...": "Recherche...",
+            "Type to search (ex: Paris; Lyon)...": "Tapez pour rechercher (ex: Paris; Lyon)...",
+            "Active Filter:": "Filtre Actif :" 
+        }
+        
+        if (isFrench && dictionary[text] !== undefined) return dictionary[text]
+        return text 
+    }
+
+    /* ========= TIMERS ========= */
+    Timer {
+        id: zoomTimer
+        interval: 200
+        repeat: false
+        onTriggered: performZoom()
+    }
+    
+    Timer {
+        id: searchDelayTimer
+        interval: 500
+        repeat: false
+        onTriggered: performDynamicSearch()
+    }
+
+    /* ========= BANDEAU D'INFORMATION (STYLE TOAST) ========= */
+    Rectangle {
+        id: infoBanner
+        parent: mapCanvas 
+        z: 9999 
+        height: 32 
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 60 
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: Math.min(bannerLayout.implicitWidth + 30, parent.width - 120)
+        radius: 16 
+        color: "#B3333333" 
+        border.width: 0
+
+        visible: filterToolRoot.filterActive && !filterToolRoot.isFormVisible
+
+        RowLayout {
+            id: bannerLayout
+            anchors.fill: parent
+            anchors.leftMargin: 15
+            anchors.rightMargin: 15
+            spacing: 10
+
+            Rectangle {
+                width: 8
+                height: 8
+                radius: 4
+                color: "#80cc28"
+                Layout.alignment: Qt.AlignVCenter
+            }
+
+            Item {
+                id: clipContainer
+                Layout.preferredWidth: bannerText.contentWidth
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true 
+
+                Text {
+                    id: bannerText
+                    text: {
+                        var val = filterToolRoot.savedFilterText.trim()
+                        if (val.endsWith(";")) {
+                            val = val.substring(0, val.length - 1).trim()
+                        }
+                        return filterToolRoot.savedLayerName + " | " + filterToolRoot.savedFieldName + " : " + val
+                    }
+                    color: "white" 
+                    font.bold: true
+                    font.pixelSize: 13 
+                    wrapMode: Text.NoWrap 
+                    horizontalAlignment: Text.AlignLeft
+                    verticalAlignment: Text.AlignVCenter
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: 0
+                    
+                    SequentialAnimation on x {
+                        running: clipContainer && bannerText.contentWidth > clipContainer.width && infoBanner.visible
+                        loops: Animation.Infinite
+                        PauseAnimation { duration: 2000 }
+                        NumberAnimation {
+                            to: (clipContainer ? clipContainer.width : 0) - bannerText.contentWidth
+                            duration: Math.max(0, (bannerText.contentWidth - (clipContainer ? clipContainer.width : 0)) * 20 + 2000)
+                            easing.type: Easing.InOutQuad
+                        }
+                        PauseAnimation { duration: 1000 }
+                        NumberAnimation {
+                            to: 0
+                            duration: Math.max(0, (bannerText.contentWidth - (clipContainer ? clipContainer.width : 0)) * 20 + 2000)
+                            easing.type: Easing.InOutQuad
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /* ========= DIALOG ========= */
+    Dialog {
+        id: searchDialog
+        parent: mainWindow.contentItem
+        modal: true
+        width: Math.min(450, mainWindow.width * 0.90)
+        height: mainCol.implicitHeight + 30
+        
+        x: (parent.width - width) / 2
+        y: {
+            var centerPos = (parent.height - height) / 2
+            var isPortrait = parent.height > parent.width
+            var offset = isPortrait ? (parent.height * 0.10) : 0
+            return centerPos - offset
+        }
+
+        background: Rectangle {
+            color: "white"
+            border.color: "#80cc28"
+            border.width: 3
+            radius: 8
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            z: -1
+            propagateComposedEvents: true
+            onClicked: {
+                if (valueField.focus) {
+                    valueField.focus = false;
+                    suggestionPopup.close()
+                }
+                mouse.accepted = false;
+            }
+        }
+
+        ColumnLayout {
+            id: mainCol
+            anchors.fill: parent
+            anchors.margins: 8
+            spacing: 12
+
+            Label {
+                text: tr("FILTER")
+                font.bold: true
+                font.pointSize: 18
+                color: "black"
+                horizontalAlignment: Text.AlignHCenter
+                Layout.fillWidth: true
+                Layout.topMargin: -10
+                Layout.bottomMargin: 2
+            }
+
+            QfComboBox {
+                id: layerSelector
+                Layout.fillWidth: true
+                Layout.preferredHeight: 35
+                Layout.topMargin: -10
+                topPadding: 2; bottomPadding: 2
+                model: []
+                onCurrentTextChanged: {
+                    if (currentText === tr("Select a layer")) {
+                        selectedLayer = null
+                        fieldSelector.model = [tr("Select a field")]
+                        fieldSelector.currentIndex = 0
+                        valueField.model = []
+                        updateApplyState()
+                        return
+                    }
+                    selectedLayer = getLayerByName(currentText)
+                    updateFields()
+                    updateApplyState()
+                }
+            }
+
+            QfComboBox {
+                id: fieldSelector
+                Layout.fillWidth: true
+                Layout.preferredHeight: 35
+                topPadding: 2; bottomPadding: 2
+                model: []
+                onActivated: {
+                    valueField.text = ""
+                    valueField.model = []
+                    updateApplyState()
+                }
+                onCurrentTextChanged: {
+                    updateApplyState()
+                }
+            }
+
+            Label {
+                text: tr("Filter value(s) (separate by ;) :")
+                Layout.topMargin: -8
+                Layout.bottomMargin: -10
+            }
+
+            TextField {
+                id: valueField
+                Layout.fillWidth: true
+                Layout.preferredHeight: 35
+                topPadding: 6
+                bottomPadding: 6
+                placeholderText: tr("Type to search (ex: Paris; Lyon)...")
+                Layout.bottomMargin: 2
+
+                property var model: []
+                property bool isLoading: false
+
+                onActiveFocusChanged: {
+                    if (activeFocus) {
+                        var parts = text.split(";")
+                        var lastPart = parts[parts.length - 1].trim()
+                        if (lastPart.length > 0) {
+                            if (model.length > 0) suggestionPopup.open()
+                            else performDynamicSearch()
+                        }
+                    }
+                }
+
+                onTextEdited: {
+                    var parts = text.split(";")
+                    var lastPart = parts[parts.length - 1].trim()
+
+                    if (lastPart.length > 0) {
+                        searchDelayTimer.restart()
+                    } else {
+                        searchDelayTimer.stop()
+                        suggestionPopup.close()
+                        model = []
+                    }
+                    updateApplyState()
+                }
+                
+                onTextChanged: updateApplyState()
+
+                onAccepted: {
+                    suggestionPopup.close()
+                    updateApplyState()
+                }
+                
+                BusyIndicator {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.margins: 5
+                    height: parent.height * 0.6
+                    width: height
+                    running: valueField.isLoading
+                    visible: valueField.isLoading
+                }
+                
+                Popup {
+                    id: suggestionPopup
+                    y: valueField.height
+                    width: valueField.width
+                    height: Math.min(listView.contentHeight + 10, 200)
+                    padding: 1
+                    
+                    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
+                    
+                    background: Rectangle {
+                        color: "white"
+                        border.color: "#bdbdbd"
+                        radius: 2
+                    }
+
+                    ListView {
+                        id: listView
+                        anchors.fill: parent
+                        clip: true
+                        model: valueField.model
+                        
+                        delegate: ItemDelegate {
+                            text: modelData
+                            width: listView.width
+                            background: Rectangle {
+                                color: parent.highlighted ? "#e0e0e0" : "transparent"
+                            }
+                            onClicked: {
+                                var currentText = valueField.text
+                                var lastSep = currentText.lastIndexOf(";")
+                                
+                                var newText = ""
+                                if (lastSep === -1) {
+                                    newText = modelData + " ; "
+                                } else {
+                                    var prefix = currentText.substring(0, lastSep + 1)
+                                    newText = prefix + " " + modelData + " ; "
+                                }
+                                
+                                valueField.text = newText
+                                suggestionPopup.close()
+                                valueField.forceActiveFocus()
+                                valueField.model = []
+                            }
+                        }
+                    }
+                }
+            }
+
+            CheckBox {
+                id: showAllCheck
+                text: tr("Show all geometries (+filtered)")
+                checked: showAllFeatures
+                Layout.fillWidth: true
+                Layout.topMargin: -12
+                Layout.bottomMargin: -12
+                onToggled: {
+                    showAllFeatures = checked
+                    if (filterActive) applyFilter(true, false)
+                }
+            }
+
+            CheckBox {
+                id: showListCheck
+                text: tr("Show feature list")
+                checked: showFeatureList
+                Layout.fillWidth: true
+                Layout.topMargin: -12
+                Layout.bottomMargin: -16
+                onToggled: {
+                    showFeatureList = checked
+                    if (filterActive) {
+                        if (checked) {
+                            applyFilter(true, false)
+                        } else {
+                            if (featureFormItem) {
+                                featureFormItem.visible = false
+                            }
+                        }
+                    }
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 5
+                Layout.bottomMargin: 2
+                Button {
+                    id: applyButton
+                    text: tr("Apply filter")
+                    enabled: false
+                    Layout.fillWidth: true
+                    background: Rectangle { color: "#80cc28"; radius: 10 }
+                    onClicked: {
+                        applyFilter(true, true) 
+                        searchDialog.close()
+                    }
+                }
+                Button {
+                    text: tr("Delete filter")
+                    Layout.fillWidth: true
+                    background: Rectangle { color: "#333333"; radius: 10 }
+                    contentItem: Text {
+                        text: tr("Delete filter")
+                        color: "white"
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    onClicked: {
+                        removeAllFilters()
+                        searchDialog.close()
+                    }
+                }
+            }
+        }
+    }
+
+    /* ========= LOGIC ========= */
+
+    function updateLayers() {
+        var layers = ProjectUtils.mapLayers(qgisProject)
+        var names = []
+        for (var id in layers)
+            if (layers[id] && layers[id].type === 0)
+                names.push(layers[id].name)
+        names.sort()
+        if (!filterActive) names.unshift(tr("Select a layer"))
+        if (layerSelector) {
+            layerSelector.model = names
+            if (filterActive && savedLayerName !== "") {
+                var idx = names.indexOf(savedLayerName)
+                if (idx >= 0) layerSelector.currentIndex = idx
+                else layerSelector.currentIndex = 0
+            } else {
+                layerSelector.currentIndex = 0
+            }
+        }
+    }
+
+    function getLayerByName(name) {
+        var layers = ProjectUtils.mapLayers(qgisProject)
+        for (var id in layers) if (layers[id].name === name) return layers[id]
+        return null
+    }
+
+    function getFields(layer) {
+        if (!layer || !layer.fields) return []
+        var fields = layer.fields
+        if (fields.names) return fields.names.slice().sort()
+        return []
+    }
+
+    function updateFields() {
+        if (!selectedLayer) {
+            fieldSelector.model = [tr("Select a field")]
+            fieldSelector.currentIndex = 0
+            return
+        }
+        var fields = getFields(selectedLayer)
+        if (!filterActive) fields.unshift(tr("Select a field"))
+        fieldSelector.model = fields
+        if (filterActive && savedFieldName !== "") {
+            var idx = fields.indexOf(savedFieldName)
+            if (idx >= 0) {
+                fieldSelector.currentIndex = idx
+            } else {
+                fieldSelector.currentIndex = 0
+            }
+        } else {
+            fieldSelector.currentIndex = 0
+            valueField.model = []
+        }
+        updateApplyState()
+    }
+
+    function performDynamicSearch() {
+        var rawText = valueField.text
+        var parts = rawText.split(";")
+        var lastPart = parts[parts.length - 1]
+        
+        var searchText = lastPart.trim()
+        var uiName = fieldSelector.currentText
+        
+        if (!selectedLayer || uiName === tr("Select a field") || searchText === "") {
+            valueField.model = []
+            suggestionPopup.close()
+            return
+        }
+
+        valueField.isLoading = true
+
+        var names = selectedLayer.fields.names
+        var logicalIndex = -1
+        for (var i = 0; i < names.length; i++) {
+            if (names[i] === uiName) {
+                logicalIndex = i
+                break
+            }
+        }
+        if (logicalIndex === -1) {
+            valueField.isLoading = false
+            return
+        }
+
+        var realIndex = -1
+        var attributes = selectedLayer.attributeList()
+        if (attributes && logicalIndex < attributes.length) realIndex = attributes[logicalIndex]
+        else realIndex = logicalIndex + 1 
+
+        var uniqueValues = {} 
+        var valuesArray = []
+        
+        try {
+            var escapedText = searchText.replace(/'/g, "''")
+            var expression = "\"" + uiName + "\" ILIKE '%" + escapedText + "%'"
+            
+            var feature_iterator = LayerUtils.createFeatureIteratorFromExpression(selectedLayer, expression)
+            
+            var count = 0
+            var max_display_items = 50 
+            var safety_counter = 0
+            var max_scan = 5000 
+
+            while (feature_iterator.hasNext() && count < max_display_items && safety_counter < max_scan) {
+                var feature = feature_iterator.next()
+                var val = feature.attribute(realIndex)
+                if (val === undefined) val = feature.attribute(uiName)
+                
+                if (val !== null && val !== undefined) {
+                    var strVal = String(val).trim()
+                    if (strVal !== "" && strVal !== "NULL") {
+                        var alreadyInText = false
+                        for(var p=0; p<parts.length-1; p++) {
+                            if (parts[p].trim() === strVal) {
+                                alreadyInText = true; 
+                                break;
+                            }
+                        }
+
+                        if (!uniqueValues[strVal] && !alreadyInText) {
+                            uniqueValues[strVal] = true
+                            valuesArray.push(strVal)
+                            count++
+                        }
+                    }
+                }
+                safety_counter++
+            }
+            
+            valuesArray.sort()
+            valueField.model = valuesArray
+            
+            if (valuesArray.length > 0) {
+                suggestionPopup.open()
+            } else {
+                suggestionPopup.close()
+            }
+            
+        } catch (e) {
+            console.log("Error searching: " + e)
+        }
+        
+        valueField.isLoading = false
+    }
+
+    function updateApplyState() {
+        if(applyButton && selectedLayer && fieldSelector && valueField) {
+            applyButton.enabled = selectedLayer !== null && fieldSelector.currentText && fieldSelector.currentText !== tr("Select a field") && valueField.text.length > 0
+        }
+    }
+
+    function escapeValue(value) {
+        return value.trim().replace(/'/g, "''");
+    }
+
+    // --- FONCTION ZOOM ADAPTATIVE ---
+    function performZoom() {
+        if (!selectedLayer) return;
+        var bbox = selectedLayer.boundingBoxOfSelected();
+        if (bbox === undefined || bbox === null) return;
+        try { if (bbox.width < 0) return; } catch(e) { return; }
+
+        try {
+            var reprojectedExtent = GeometryUtils.reprojectRectangle(
+                bbox,
+                selectedLayer.crs,
+                mapCanvas.mapSettings.destinationCrs
+            )
+
+            var centerX = reprojectedExtent.xMinimum + (reprojectedExtent.width / 2.0);
+            var centerY = reprojectedExtent.yMinimum + (reprojectedExtent.height / 2.0);
+
+            var isPoint = (reprojectedExtent.width < 0.00001 && reprojectedExtent.height < 0.00001);
+
+            if (isPoint) {
+                var buffer = (Math.abs(centerX) > 180) ? 50.0 : 0.001;
+                reprojectedExtent.xMinimum = centerX - buffer;
+                reprojectedExtent.xMaximum = centerX + buffer;
+                reprojectedExtent.yMinimum = centerY - buffer;
+                reprojectedExtent.yMaximum = centerY + buffer;
+            } else {
+                var currentMapExtent = mapCanvas.mapSettings.extent; 
+                var screenRatio = currentMapExtent.width / currentMapExtent.height;
+                var geomRatio = reprojectedExtent.width / reprojectedExtent.height;
+                var marginScale = 1.1; 
+
+                var newWidth = 0;
+                var newHeight = 0;
+
+                if (geomRatio > screenRatio) {
+                    newWidth = reprojectedExtent.width * marginScale;
+                    newHeight = newWidth / screenRatio;
+                } else {
+                    newHeight = reprojectedExtent.height * marginScale;
+                    newWidth = newHeight * screenRatio;
+                }
+                
+                reprojectedExtent.xMinimum = centerX - (newWidth / 2.0);
+                reprojectedExtent.xMaximum = centerX + (newWidth / 2.0);
+                reprojectedExtent.yMinimum = centerY - (newHeight / 2.0);
+                reprojectedExtent.yMaximum = centerY + (newHeight / 2.0);
+            }
+            
+            mapCanvas.mapSettings.setExtent(reprojectedExtent, true);
+            mapCanvas.refresh();
+        } catch(e) {
+            mainWindow.displayToast(tr("Error Zoom: ") + e)
+        }
+    }
+
+    function refreshVisualsOnly() {
+        if (selectedLayer) {
+             mapCanvas.mapSettings.selectionColor = "#ff0000"
+             selectedLayer.triggerRepaint()
+             mapCanvas.refresh()
+        }
+    }
+
+    function applyFilter(allowFormOpen, doZoom) {
+        if (!selectedLayer || !fieldSelector.currentText || !valueField.text) return
+        if (allowFormOpen === undefined) allowFormOpen = true
+        if (doZoom === undefined) doZoom = true
+
+        try {
+            savedLayerName = layerSelector.currentText
+            savedFieldName = fieldSelector.currentText
+            savedFilterText = valueField.text
+
+            var fieldName = savedFieldName
+            var values = savedFilterText
+                .split(";")
+                .map(v => escapeValue(v.toLowerCase()))
+                .filter(v => v.length > 0)
+
+            if (values.length === 0) return
+
+            var expr = values.map(v => 'lower("' + fieldName + '") LIKE \'%' + v + '%\'').join(" OR ")
+            
+            if (showAllFeatures) selectedLayer.subsetString = "" 
+            else selectedLayer.subsetString = expr
+            
+            selectedLayer.removeSelection()
+            mapCanvas.mapSettings.selectionColor = "#ff0000"
+            selectedLayer.selectByExpression(expr)
+
+            selectedLayer.triggerRepaint()
+            mapCanvas.refresh()
+
+            if (showListCheck.checked && allowFormOpen) {
+                if (featureFormItem) {
+                    featureFormItem.model.setFeatures(selectedLayer, expr);
+                    featureFormItem.show();
+                }
+            } 
+            
+            if (doZoom) {
+                zoomTimer.start()
+            }
+            filterActive = true
+
+        } catch(e) {
+            mainWindow.displayToast(tr("Error: ") + e)
+        }
+    }
+}
