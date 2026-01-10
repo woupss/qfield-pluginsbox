@@ -14,17 +14,15 @@ Item {
     property bool isNameMismatch: false
 
     // =========================================================================
-    // 0. FONCTION DE RECHARGEMENT (Placée à la racine pour éviter les bugs)
+    // 0. FONCTION DE RECHARGEMENT
     // =========================================================================
     
     function triggerReload() {
         downloadDialog.close()
         
-        // Si le chemin du fichier téléchargé est le même que le projet ouvert
         if (fullDestinationPath === qgisProject.fileName) {
             iface.reloadProject()
         } else {
-            // Si le nom a changé, on doit ouvrir le nouveau fichier
             iface.openProject(fullDestinationPath)
         }
     }
@@ -37,14 +35,16 @@ Item {
         "fr": {
             "TITLE": "MISE À JOUR",
             "LBL_SOURCE": "URL source :",
-            "PH_URL": "https://github.com/User/Repo...",
+            "PH_URL": "https://github.com/User/Repo/blob/main/projet.qgz",
+            "CB_TOKEN": "Utiliser un token privé (GitHub PAT)",
+            "PH_TOKEN": "ghp_xxxxxxxxxxxx...",
             "LBL_TARGET": "Nom du fichier cible :",
             "WARN_REPLACE": "Le projet actuel sera remplacé.",
             "WARN_MISMATCH": "Le fichier de l'URL est différent du projet ouvert.",
             "CB_ALLOW_DIFF": "Je confirme vouloir enregistrer sous un autre nom",
             "LBL_PATH": "Dossier de destination :",
             "BTN_CLOSE": "Fermer",
-            "BTN_RELOAD": "Recharger le projet", // <-- Traduction demandée
+            "BTN_RELOAD": "Recharger le projet",
             "BTN_UPDATE_SAME": "Mettre à jour le projet",
             "BTN_UPDATE_DIFF": "Télécharger une version différente",
             "STATUS_READY": "Prêt.",
@@ -57,19 +57,23 @@ Item {
             "TOAST_WRITE_FAILED": "Échec de l'écriture",
             "INFO_ACTION": "⚠️ TÉLÉCHARGEMENT RÉUSSI :\nCliquez sur 'Recharger le projet' pour appliquer les modifications.",
             "ERR_FILENAME_DETECT": "Erreur : Nom de fichier indéterminé.",
-            "ERR_NOT_FOUND": " (Introuvable - Vérifiez le nom de la branche: main vs master ?)"
+            "ERR_NOT_FOUND": " (404 Introuvable)\nVérifiez l'URL, la branche ou les droits du token.",
+            "ERR_AUTH": " (401 Non autorisé)\nVérifiez votre Token.",
+            "ERR_API_CONVERT": "Impossible de convertir l'URL au format API."
         },
         "en": {
             "TITLE": "UPDATE",
             "LBL_SOURCE": "Source URL:",
-            "PH_URL": "https://github.com/User/Repo...",
+            "PH_URL": "https://github.com/User/Repo/blob/main/project.qgz",
+            "CB_TOKEN": "Use private token (GitHub PAT)",
+            "PH_TOKEN": "ghp_xxxxxxxxxxxx...",
             "LBL_TARGET": "Target filename:",
             "WARN_REPLACE": "The current project will be replaced.",
             "WARN_MISMATCH": "URL filename differs from open project.",
             "CB_ALLOW_DIFF": "I confirm saving with a different name",
             "LBL_PATH": "Destination folder:",
             "BTN_CLOSE": "Close",
-            "BTN_RELOAD": "Reload Project", // <-- Translation requested
+            "BTN_RELOAD": "Reload Project",
             "BTN_UPDATE_SAME": "Update Project",
             "BTN_UPDATE_DIFF": "Download different version",
             "STATUS_READY": "Ready.",
@@ -82,7 +86,9 @@ Item {
             "TOAST_WRITE_FAILED": "Write failed",
             "INFO_ACTION": "⚠️ DOWNLOAD SUCCESSFUL:\nClick 'Reload Project' to apply changes.",
             "ERR_FILENAME_DETECT": "Error: Could not determine filename.",
-            "ERR_NOT_FOUND": " (Not Found - Check branch name: main vs master?)"
+            "ERR_NOT_FOUND": " (404 Not Found)\nCheck URL, branch or token permissions.",
+            "ERR_AUTH": " (401 Unauthorized)\nCheck your Token.",
+            "ERR_API_CONVERT": "Could not convert URL to API format."
         }
     }
 
@@ -167,6 +173,9 @@ Item {
         allowDiffCheckbox.checked = false
         isNameMismatch = false
         
+        useTokenCheckbox.checked = false
+        tokenInput.text = ""
+        
         downloadDialog.open()
         calculatePath(); 
     }
@@ -192,28 +201,52 @@ Item {
         }
     }
 
-    function getRawUrl(url) {
+    // --- MODE SANS TOKEN (ORIGINAL) ---
+    function getRawUrlOld(url) {
         var processed = url.trim();
-        
-        if (processed.indexOf("http") !== 0) {
-            processed = "https://" + processed;
-        }
+        if (processed.indexOf("http") !== 0) processed = "https://" + processed;
 
-        if (processed.indexOf("github.com") === -1) return processed;
         if (processed.indexOf("raw.githubusercontent.com") !== -1) return processed;
-        if (processed.indexOf("/raw/") !== -1) return processed;
+        if (processed.indexOf("github.com") === -1) return processed;
 
-        if (processed.indexOf("/blob/") !== -1) return processed.replace("/blob/", "/raw/");
-        if (processed.indexOf("/tree/") !== -1) return processed.replace("/tree/", "/raw/");
-
-        var regex = /^(https?:\/\/(?:www\.)?github\.com\/[^\/]+\/[^\/]+)(\/.+)$/;
-        var match = processed.match(regex);
+        var blobRegex = /^(https?:\/\/(?:www\.)?)github\.com\/([^\/]+\/[^\/]+)\/(?:blob|raw)\/([^\/]+)\/(.+)$/;
+        var blobMatch = processed.match(blobRegex);
+        if (blobMatch) {
+            return "https://raw.githubusercontent.com/" + blobMatch[2] + "/" + blobMatch[3] + "/" + blobMatch[4];
+        }
         
-        if (match) {
-            return match[1] + "/raw/main" + match[2];
+        var shortRegex = /^(https?:\/\/(?:www\.)?)github\.com\/([^\/]+\/[^\/]+)\/(.+)$/;
+        var shortMatch = processed.match(shortRegex);
+        if (shortMatch) {
+             return "https://raw.githubusercontent.com/" + shortMatch[2] + "/main/" + shortMatch[3];
         }
 
         return processed;
+    }
+
+    // --- MODE AVEC TOKEN (NOUVEAU) ---
+    function getApiUrl(url) {
+        var processed = url.trim();
+        if (processed.indexOf("http") !== 0) processed = "https://" + processed;
+        
+        var regex = /github\.com\/([^\/]+)\/([^\/]+)\/(?:blob|raw|tree)\/([^\/]+)\/(.+)/;
+        var match = processed.match(regex);
+        
+        if (match) {
+            var user = match[1];
+            var repo = match[2];
+            var branch = match[3];
+            var path = match[4];
+            return "https://api.github.com/repos/" + user + "/" + repo + "/contents/" + path + "?ref=" + branch;
+        }
+        
+        var shortRegex = /github\.com\/([^\/]+)\/([^\/]+)\/(.+)/;
+        var shortMatch = processed.match(shortRegex);
+        if (shortMatch) {
+            return "https://api.github.com/repos/" + shortMatch[1] + "/" + shortMatch[2] + "/contents/" + shortMatch[3] + "?ref=main";
+        }
+        
+        return ""; 
     }
 
     function getCorrectedFileName() {
@@ -265,6 +298,10 @@ Item {
     }
 
     function startDownload() {
+        // [CORRECTION 1] Forcer la perte de focus pour valider l'input et cacher le clavier
+        dummyFocus.forceActiveFocus();
+        Qt.inputMethod.hide();
+
         calculatePath(); 
         var finalName = getCorrectedFileName();
         var rawInputUrl = urlInput.text.trim();
@@ -285,7 +322,19 @@ Item {
             urlWithFile += finalName;
         }
 
-        var finalUrl = getRawUrl(urlWithFile);
+        var finalUrl = "";
+        
+        if (useTokenCheckbox.checked) {
+            finalUrl = getApiUrl(urlWithFile);
+            if (finalUrl === "") {
+                mainWindow.displayToast(tr("ERR_API_CONVERT"));
+                return;
+            }
+        } else {
+            finalUrl = getRawUrlOld(urlWithFile);
+        }
+
+        console.log("Downloading URL: " + finalUrl);
 
         pBar.visible = true
         pBar.indeterminate = true
@@ -299,6 +348,21 @@ Item {
         xhr.open("GET", finalUrl)
         xhr.responseType = "arraybuffer"
 
+        // --- GESTION TOKEN CORRIGÉE ---
+        if (useTokenCheckbox.checked) {
+            // [CORRECTION 2] Utilisation de replace au lieu de trim
+            // Cela supprime tous les espaces, sauts de lignes, tabs (\s)
+            var tkn = tokenInput.text.replace(/\s/g, "");
+            
+            // Console log pour debug
+            console.log("Token used (clean): " + tkn); 
+            
+            if (tkn !== "") {
+                xhr.setRequestHeader("Authorization", "Bearer " + tkn);
+                xhr.setRequestHeader("Accept", "application/vnd.github.v3.raw");
+            }
+        }
+
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE) {
                 pBar.visible = false
@@ -309,6 +373,7 @@ Item {
                 } else {
                     var err = "HTTP Error: " + xhr.status
                     if (xhr.status === 404) err += tr("ERR_NOT_FOUND")
+                    else if (xhr.status === 401 || xhr.status === 403) err += tr("ERR_AUTH")
                     statusText.text = err
                     statusText.color = "red"
                     mainWindow.displayToast(err)
@@ -349,8 +414,11 @@ Item {
         id: downloadDialog
         parent: mainWindow.contentItem
         modal: true
-        width: Math.min(340, mainWindow.width * 0.80)
-        anchors.centerIn: parent
+        width: Math.min(360, mainWindow.width * 0.85)
+
+        x: (parent.width - width) / 2
+        y: ((parent.height - height) / 2) - (parent.height * 0.15)
+        
         standardButtons: Dialog.NoButton
         
         background: Rectangle { 
@@ -411,7 +479,48 @@ Item {
                     placeholderText: tr("PH_URL")
                     selectByMouse: true
                     Layout.fillWidth: true
+                    // Empêcher la correction auto sur les URL
+                    inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoAutoUppercase
                     onTextChanged: calculatePath()
+                }
+
+                // --- TOKEN CHECKBOX ---
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 5
+                    spacing: 8
+                    
+                    CheckBox {
+                        id: useTokenCheckbox
+                        checked: false
+                    }
+                    Text {
+                        text: tr("CB_TOKEN")
+                        color: "#333"
+                        font.pixelSize: 12
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: useTokenCheckbox.checked = !useTokenCheckbox.checked
+                        }
+                    }
+                }
+
+                // --- TOKEN INPUT ---
+                MarqueeTextField {
+                    id: tokenInput
+                    visible: useTokenCheckbox.checked
+                    text: ""
+                    placeholderText: tr("PH_TOKEN")
+                    selectByMouse: true
+                    echoMode: TextInput.Password 
+                    Layout.fillWidth: true
+                    Layout.topMargin: 0
+                    
+                    // [CORRECTION 3] Configuration cruciale pour les tokens
+                    // Désactive prédiction, majuscule auto et correction auto
+                    inputMethodHints: Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText | Qt.ImhSensitiveData | Qt.ImhNoAutoCorrect
                 }
 
                 // --- FILENAME INPUT ---
@@ -466,7 +575,7 @@ Item {
                     }
                 }
 
-                // --- AVERTISSEMENT STANDARD ---
+                // --- AVERTISSEMENT ---
                 Text { 
                     visible: !isNameMismatch
                     text: tr("WARN_REPLACE")
@@ -546,7 +655,6 @@ Item {
                     Button {
                         id: downloadBtn
                         
-                        // Texte dynamique traduit
                         text: isSuccess ? tr("BTN_RELOAD") : (isNameMismatch ? tr("BTN_UPDATE_DIFF") : tr("BTN_UPDATE_SAME"))
                         
                         Layout.preferredWidth: Math.max(220, contentItem.implicitWidth + 24)
@@ -568,7 +676,6 @@ Item {
                         
                         onClicked: {
                             if (isSuccess) {
-                                // APPEL À LA FONCTION RACINE pour garantir que iface est trouvé
                                 updateToolRoot.triggerReload()
                             } else {
                                 startDownload()
