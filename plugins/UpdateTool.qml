@@ -14,7 +14,23 @@ Item {
     property bool isNameMismatch: false
 
     // =========================================================================
-    // 0. GESTION DES TRADUCTIONS
+    // 0. FONCTION DE RECHARGEMENT (Placée à la racine pour éviter les bugs)
+    // =========================================================================
+    
+    function triggerReload() {
+        downloadDialog.close()
+        
+        // Si le chemin du fichier téléchargé est le même que le projet ouvert
+        if (fullDestinationPath === qgisProject.fileName) {
+            iface.reloadProject()
+        } else {
+            // Si le nom a changé, on doit ouvrir le nouveau fichier
+            iface.openProject(fullDestinationPath)
+        }
+    }
+
+    // =========================================================================
+    // 1. GESTION DES TRADUCTIONS
     // =========================================================================
 
     property var translations: {
@@ -28,7 +44,7 @@ Item {
             "CB_ALLOW_DIFF": "Je confirme vouloir enregistrer sous un autre nom",
             "LBL_PATH": "Dossier de destination :",
             "BTN_CLOSE": "Fermer",
-            "BTN_RELOAD": "Recharger le projet", // <--- NOUVEAU
+            "BTN_RELOAD": "Recharger le projet", // <-- Traduction demandée
             "BTN_UPDATE_SAME": "Mettre à jour le projet",
             "BTN_UPDATE_DIFF": "Télécharger une version différente",
             "STATUS_READY": "Prêt.",
@@ -39,7 +55,7 @@ Item {
             "TOAST_URL_EMPTY": "L'URL est vide !",
             "TOAST_FILENAME_INVALID": "Nom de fichier invalide !",
             "TOAST_WRITE_FAILED": "Échec de l'écriture",
-            "INFO_ACTION": "⚠️ TÉLÉCHARGEMENT RÉUSSI :\nCliquez sur 'Recharger le projet' pour appliquer les modifications.", // <--- TEXTE MODIFIÉ
+            "INFO_ACTION": "⚠️ TÉLÉCHARGEMENT RÉUSSI :\nCliquez sur 'Recharger le projet' pour appliquer les modifications.",
             "ERR_FILENAME_DETECT": "Erreur : Nom de fichier indéterminé.",
             "ERR_NOT_FOUND": " (Introuvable - Vérifiez le nom de la branche: main vs master ?)"
         },
@@ -53,7 +69,7 @@ Item {
             "CB_ALLOW_DIFF": "I confirm saving with a different name",
             "LBL_PATH": "Destination folder:",
             "BTN_CLOSE": "Close",
-            "BTN_RELOAD": "Reload Project", // <--- NEW
+            "BTN_RELOAD": "Reload Project", // <-- Translation requested
             "BTN_UPDATE_SAME": "Update Project",
             "BTN_UPDATE_DIFF": "Download different version",
             "STATUS_READY": "Ready.",
@@ -64,7 +80,7 @@ Item {
             "TOAST_URL_EMPTY": "URL is empty!",
             "TOAST_FILENAME_INVALID": "Filename is invalid!",
             "TOAST_WRITE_FAILED": "Write failed",
-            "INFO_ACTION": "⚠️ DOWNLOAD SUCCESSFUL:\nClick 'Reload Project' to apply changes.", // <--- TEXT CHANGED
+            "INFO_ACTION": "⚠️ DOWNLOAD SUCCESSFUL:\nClick 'Reload Project' to apply changes.",
             "ERR_FILENAME_DETECT": "Error: Could not determine filename.",
             "ERR_NOT_FOUND": " (Not Found - Check branch name: main vs master?)"
         }
@@ -81,7 +97,7 @@ Item {
     }
 
     // =========================================================================
-    // 1. COMPOSANT PERSONNALISÉ : MARQUEE TEXT FIELD
+    // 2. COMPOSANT PERSONNALISÉ : MARQUEE TEXT FIELD
     // =========================================================================
     
     component MarqueeTextField : TextField {
@@ -134,7 +150,7 @@ Item {
     }
 
     // =========================================================================
-    // 2. LOGIQUE METIER & INTERFACE PUBLIQUE
+    // 3. LOGIQUE METIER & INTERFACE PUBLIQUE
     // =========================================================================
 
     function openUpdateUI() {
@@ -326,7 +342,7 @@ Item {
     }
 
     // =========================================================================
-    // 3. INTERFACE (DIALOGUE)
+    // 4. INTERFACE (DIALOGUE)
     // =========================================================================
 
     Dialog {
@@ -530,7 +546,7 @@ Item {
                     Button {
                         id: downloadBtn
                         
-                        // --- CHANGEMENT ICI : Texte dynamique avec "Recharger" ---
+                        // Texte dynamique traduit
                         text: isSuccess ? tr("BTN_RELOAD") : (isNameMismatch ? tr("BTN_UPDATE_DIFF") : tr("BTN_UPDATE_SAME"))
                         
                         Layout.preferredWidth: Math.max(220, contentItem.implicitWidth + 24)
@@ -538,7 +554,6 @@ Item {
                         enabled: isSuccess ? true : (isNameMismatch ? allowDiffCheckbox.checked : true)
                         
                         background: Rectangle { 
-                            // Change la couleur en vert si succès
                             color: isSuccess ? "#80cc28" : (parent.enabled ? Theme.mainColor : "#ccc")
                             radius: 4 
                         }
@@ -553,10 +568,8 @@ Item {
                         
                         onClicked: {
                             if (isSuccess) {
-                                // --- CHANGEMENT ICI : Action de rechargement ---
-                                // Recharge le projet téléchargé
-                                mainWindow.openProject(fullDestinationPath)
-                                downloadDialog.close()
+                                // APPEL À LA FONCTION RACINE pour garantir que iface est trouvé
+                                updateToolRoot.triggerReload()
                             } else {
                                 startDownload()
                             }
