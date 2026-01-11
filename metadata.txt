@@ -3,5 +3,5 @@ name=PluginsBox
 description= One plugin for many plugins
 author=woupss
 icon=icon.svg
-version=0.1
+version=0.2
 homepage=https://github.com/woupss/
