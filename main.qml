@@ -25,7 +25,7 @@ Item {
         var dictionary = {
             // Titres et labels
             "Plugin Box": "Boîte à plugins",
-            "Tip: Long press": "Astuce : Appui long sur l'icône du plugin\npour supprimer tous les filtres.",
+            "Tip: Long press on plugin icon to delete all filters": "Astuce : Appui long sur l'icône du plugin\npour supprimer tous les filtres.",
             
             // Boutons (avec Emojis)
             "FILTERS": "🔍 FILTRES",
