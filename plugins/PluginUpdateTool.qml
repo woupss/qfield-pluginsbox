@@ -32,7 +32,6 @@ Item {
         "or_custom": { "en": "OR custom URL:", "fr": "OU une URL personnalisée :" },
         "destination": { "en": "Target destination:", "fr": "Dossier de destination :" },
         "installed_ver": { "en": "Installed version: ", "fr": "Version installée : " },
-        "disable_plugin": { "en": "Disable plugin", "fr": "Désactiver le plugin" },
         "btn_wait": { "en": "WAIT...", "fr": "ATTENTE..." },
         "btn_install": { "en": "INSTALL NOW", "fr": "INSTALLER" },
         "btn_update": { "en": "UPDATE", "fr": "METTRE À JOUR" },
@@ -108,9 +107,6 @@ Item {
         rootItem.targetUuid = ""; 
         rootItem.targetName = ""; 
         rootItem.targetAuthor = "";
-        
-        // Reset checkbox
-        if (disableCheckbox) disableCheckbox.checked = false;
         
         updateDialog.open(); 
         startGlobalUpdateCheck();
@@ -485,7 +481,6 @@ Item {
                         } else {
                              rootItem.installedVersion = ""; rootItem.targetName = ""; rootItem.targetUuid = ""; rootItem.targetAuthor = "";
                         }
-                        disableCheckbox.checked = false; 
                         rootItem.displayUrl = ""; rootItem.preparedUrl = "";
                         preCheckVersion(); 
                     }
@@ -496,7 +491,6 @@ Item {
                     onClicked: { 
                         pluginCombo.currentIndex = -1; statusText.text = ""; rootItem.detectedVersion = ""; 
                         rootItem.installedVersion = ""; rootItem.displayUrl = ""; updateTargetDisplay(); 
-                        disableCheckbox.checked = false;
                     }
                 }
             }
@@ -518,7 +512,6 @@ Item {
                 verticalAlignment: TextInput.AlignVCenter
                 onTextChanged: { 
                     pluginCombo.currentIndex = -1; rootItem.installedVersion = ""; rootItem.displayUrl = ""; 
-                    disableCheckbox.checked = false;
                     if(text.length > 10) preCheckVersion(); else updateTargetDisplay();
                 }
             }
@@ -549,20 +542,7 @@ Item {
                 text: tr("installed_ver") + rootItem.installedVersion 
             }
 
-            // CHECKBOX "Désactiver le plugin"
-            CheckBox {
-                id: disableCheckbox
-                text: tr("disable_plugin")
-                visible: rootItem.installedVersion !== "" 
-                checked: false 
-                Layout.alignment: Qt.AlignHCenter
-                
-                onCheckedChanged: {
-                    if (rootItem.targetUuid !== "" && typeof pluginManager.setPluginEnabled === "function") {
-                        pluginManager.setPluginEnabled(rootItem.targetUuid, !checked);
-                    }
-                }
-            }
+            // CHECKBOX SUPPRIMÉE ICI
 
             Text {
                 id: statusText; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter
