@@ -25,7 +25,7 @@ Item {
         var dictionary = {
             // Titres et labels
             "Plugin Box": "Boîte à plugins",
-            "Tip: Long press on plugin icon to delete all filters": "Astuce : Appui long sur l'icône du plugin\npour supprimer tous les filtres.",
+            "Tip: Long press on plugin icon to delete all filters\n or long press on FILTERS button": "Astuce : Appui long sur l'icône du plugin\npour supprimer tous les filtres\nou restez appuyez sur le bouton FILTRES",
             
             // Boutons (avec Emojis)
             "FILTERS": "🔍 FILTRES",
@@ -153,6 +153,12 @@ Item {
                     launcherDialog.close()
                     filterTool.openFilterUI()
                 }
+
+                // 2. Appui long : Supprime les filtres (comme le bouton principal)
+                onPressAndHold: {
+                    launcherDialog.close() // On ferme le menu pour valider l'action visuellement
+                    filterTool.removeAllFilters() // Action de nettoyage
+                }
             }
 
             // --- BOUTON 2 : POSITION ---
@@ -208,7 +214,7 @@ Item {
             
             // Petit texte d'aide
             Label {
-                text: tr("Tip: Long press on plugin icon to delete all filters")
+                text: tr("Tip: Long press on plugin icon to delete all filters\n or long press on FILTERS button")
                 color: Theme.secondaryTextColor
                 font.pixelSize: 10
                 horizontalAlignment: Text.AlignHCenter
