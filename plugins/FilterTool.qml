@@ -249,7 +249,7 @@ Item {
         var isFrench = Qt.locale().name.substring(0, 2) === "fr"
         var dictionary = {
             "Filter deleted": "Filtre supprimé", "FILTER": "FILTRE",
-            "Select a layer": "Sélectionner une couche", "Select a field": "Sélectionner un champ",
+            "Select a layer": "Sélectionnez une couche", "Select a field": "Sélectionnez un champ",
             "Filter value(s) (separate by ;) :": "Valeur(s) du filtre (séparer par ;) :",
             "Show all geometries (+filtered)": "Afficher toutes géométries (+filtrées)",
             "Show feature list": "Afficher liste des entités", "Apply filter": "Appliquer le filtre",
