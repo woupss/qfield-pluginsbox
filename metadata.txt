@@ -3,5 +3,5 @@ name=PluginsBox
 description= One plugin for many plugins
 author=woupss
 icon=icon.svg
-version=0.6
+version=0.7
 homepage=https://github.com/woupss/qfield-pluginsbox

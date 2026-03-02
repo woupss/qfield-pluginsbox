@@ -60,7 +60,6 @@ Item {
         id: filterTool
     }
     
-    // --- REMPLACEMENT ICI : PluginUpdateTool remplace DeleteTool ---
     PluginUpdateTool {
         id: pluginUpdateTool
     }
