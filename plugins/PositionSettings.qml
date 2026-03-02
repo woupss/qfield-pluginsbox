@@ -3,7 +3,7 @@ import QtCore
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
-import QtQuick.Shapes
+import QtQuick.Shapes 
 import org.qfield
 import org.qgis
 import Theme
@@ -13,14 +13,17 @@ Item {
     id: positionPluginRoot
     property var mainWindow: iface.mainWindow()
 
+    // --- LIEN AVEC LE MAIN CENTRAL ---
+    // Fonction appelée par le main.qml central pour ouvrir les paramètres
     function openSettings() {
         positionColorDialog.open()
     }
 
-    // --- TRADUCTIONS ---
+    // --- 1. TRADUCTIONS (Fusionnées Code 1 & 2) ---
     property string currentLang: Qt.locale().name.substring(0, 2)
     function tr(key) {
         var translations = {
+            // Section Position (Code 1)
             "pos_label":       { "en": "Fill",               "fr": "Remplissage" },
             "pos_desc":        { "en": "Arrow & Dot",        "fr": "Flèche & Point" },
             "stroke_label":    { "en": "Borders",            "fr": "Bordures" },
@@ -37,7 +40,7 @@ Item {
             "dot_size":        { "en": "Dot Size",           "fr": "Taille Point" },
             "dot_s_desc":      { "en": "Diameter",           "fr": "Diamètre" },
             
-            // CROSSHAIR
+            // Section Viseur / Crosshair (Code 2)
             "cross_c":         { "en": "Crosshair Color",    "fr": "Couleur curseur" },
             "cross_c_desc":    { "en": "Center line",        "fr": "Remplissage" },
             "cross_b":         { "en": "Border Color",       "fr": "Couleur Bordure" },
@@ -46,6 +49,7 @@ Item {
             "cross_w":         { "en": "Crosshair Width",    "fr": "Épaisseur curseur de position" },
             "cross_bw":        { "en": "Border Width",       "fr": "Épaisseur Bordure (curseur)" },
             
+            // Onglets
             "tab_pos":         { "en": "Position",           "fr": "Position" },
             "tab_cross":       { "en": "Crosshair",          "fr": "Curseur de position" }
         }
@@ -54,14 +58,14 @@ Item {
         return key;
     }
 
-    // --- CONFIGURATION ---
+    // --- 2. CONFIGURATION (Structure améliorée du Code 2) ---
     property var positionColorConfig: ({
         // GROUPE POS
         "positionColor":           { "group": "pos", "name": tr("pos_label"),    "desc": tr("pos_desc"),     "type": "color" },
         "positionStrokeColor":     { "group": "pos", "name": tr("stroke_label"), "desc": tr("stroke_desc"),  "type": "color" },
         "accuracyBorderColor":     { "group": "pos", "name": tr("acc_border_c"), "desc": tr("acc_border_d"), "type": "color" },
-        "movementSize":            { "group": "pos", "name": tr("arrow_size"),   "desc": "", "type": "number", "min": 10, "max": 60, "step": 2 },
-        "movementStrokeWidth":     { "group": "pos", "name": tr("arrow_w"),      "desc": "", "type": "number", "min": 0, "max": 10, "step": 0.5 },
+        "movementSize":            { "group": "pos", "name": tr("arrow_size"),   "desc": "", "type": "number", "min": 10, "max": 60, "step": 1 },
+        "movementStrokeWidth":     { "group": "pos", "name": tr("arrow_w"),      "desc": "", "type": "number", "min": 0, "max": 10, "step": 0.1 },
         "positionMarkerSize":      { "group": "pos", "name": tr("dot_size"),     "desc": tr("dot_s_desc"),   "type": "number", "min": 5, "max": 40, "step": 1 },
         "positionBorderWidth":     { "group": "pos", "name": tr("dot_w"),        "desc": "",   "type": "number", "min": 0, "max": 5, "step": 0.1 },
         "accuracyBorderWidth":     { "group": "pos", "name": tr("acc_w"),        "desc": "",   "type": "number", "min": 0, "max": 5, "step": 0.1 },
@@ -69,14 +73,14 @@ Item {
         // GROUPE CROSS (Viseur)
         "crosshairColor":          { "group": "cross", "name": tr("cross_c"),      "desc": tr("cross_c_desc"), "type": "color" },
         "crosshairBorderColor":    { "group": "cross", "name": tr("cross_b"),      "desc": tr("cross_b_desc"), "type": "color" },
-        "crosshairSize":           { "group": "cross", "name": tr("cross_s"),      "desc": "", "type": "number", "min": 20, "max": 100, "step": 5 },
-        "crosshairWidth":          { "group": "cross", "name": tr("cross_w"),      "desc": "", "type": "number", "min": 1, "max": 10, "step": 0.5 },
-        "crosshairBorderWidth":    { "group": "cross", "name": tr("cross_bw"),     "desc": "", "type": "number", "min": 0, "max": 5, "step": 0.5 }
+        "crosshairSize":           { "group": "cross", "name": tr("cross_s"),      "desc": "", "type": "number", "min": 20, "max": 100, "step": 2 },
+        "crosshairWidth":          { "group": "cross", "name": tr("cross_w"),      "desc": "", "type": "number", "min": 1, "max": 10, "step": 0.1 },
+        "crosshairBorderWidth":    { "group": "cross", "name": tr("cross_bw"),     "desc": "", "type": "number", "min": 0, "max": 5, "step": 0.1 }
     })
 
     property var allKeys: Object.keys(positionColorConfig)
     
-    // Filtres
+    // Filtres pour les onglets
     property var posColorKeys: allKeys.filter(function(k){ return positionColorConfig[k].group === 'pos' && positionColorConfig[k].type === 'color' })
     property var posSliderKeys: allKeys.filter(function(k){ return positionColorConfig[k].group === 'pos' && positionColorConfig[k].type === 'number' })
     
@@ -87,26 +91,47 @@ Item {
         "positionColor": "#3388FF",           
         "positionStrokeColor": "#FFFFFF",
         "accuracyBorderColor": "#3388FF",
-        "movementSize": 26.0,
-        "movementStrokeWidth": 3.0,
-        "positionMarkerSize": 14.0,
-        "positionBorderWidth": 2.0,
+        "movementSize": 30.0,
+        "movementStrokeWidth": 1.8,
+        "positionMarkerSize": 15.0,
+        "positionBorderWidth": 1.7,
         "accuracyBorderWidth": 0.7,
         "crosshairColor": "#000000",
         "crosshairBorderColor": "#FFFFFF",
-        "crosshairSize": 48.0,
-        "crosshairWidth": 2.0,
-        "crosshairBorderWidth": 1.0
+        "crosshairSize": 50.0,
+        "crosshairWidth": 2.4,
+        "crosshairBorderWidth": 1.1
     })
 
-    // --- SAUVEGARDE ---
     Settings {
         id: themeSettings
-        category: "PositionPlugin"
+        category: "PositionPlugin" // Ajout de la catégorie du Code 2 pour propreté
         property string jsonColors: "{}" 
     }
 
-    // --- LOGIQUE METIER ---
+    // --- 3. LOGIQUE MÉTIER (Marker + Crosshair) ---
+       // --- Logique button---
+    function findGnssButton(parent) {
+        if (!parent || !parent.children) return null;
+        for (var i = 0; i < parent.children.length; i++) {
+            var child = parent.children[i];
+            if (child.hasOwnProperty("followActive") && child.hasOwnProperty("autoRefollow")) return child;
+            var res = findGnssButton(child);
+            if (res) return res;
+        }
+        return null;
+    }
+
+    function updatePositionButton(key, value) {
+        if (key !== "positionColor") return;
+        var btn = findGnssButton(mainWindow.contentItem);
+        if (btn) {
+            btn.iconColor = Qt.binding(function() { return btn.followActive ? Theme.toolButtonColor : value });
+            btn.bgcolor = Qt.binding(function() { return btn.followActive ? value : Theme.toolButtonBackgroundColor });
+        }
+    }
+
+    // --- Logique Position (Marker) ---
     function findLocationMarker(parent) {
         if (!parent || !parent.children) return null;
         for (var i = 0; i < parent.children.length; i++) {
@@ -159,6 +184,7 @@ Item {
         }
     }
 
+    // --- Logique Crosshair (Viseur) - Importé du Code 2 ---
     function findLocatorItem(parent) {
         if (!parent || !parent.children) return null;
         for (var i = 0; i < parent.children.length; i++) {
@@ -195,7 +221,7 @@ Item {
         }
 
         var paths = crosshairCircle.data; 
-        var shapePaths = [];
+        var shapePaths =[];
         for(var p=0; p<paths.length; p++) {
             if(paths[p].toString().indexOf("ShapePath") !== -1) shapePaths.push(paths[p]);
         }
@@ -222,18 +248,17 @@ Item {
         }
     }
 
+    // --- Gestion des changements ---
     function applyChange(key, value) {
         try {
             if (key === undefined || key === "") return;
             var currentJson = themeSettings.jsonColors || "{}";
             var colorsObj = JSON.parse(currentJson);
             colorsObj[key] = value;
-            
-            if (positionPluginRoot.positionColorConfig[key].type === "color" && Theme.hasOwnProperty(key)) {
-                Theme.applyColors(colorsObj); 
-            }
+            if (positionPluginRoot.positionColorConfig[key].type === "color" && Theme.hasOwnProperty(key)) Theme.applyColors(colorsObj); 
             updateLiveMarker(key, value);
             updateCrosshair(key, value);
+            updatePositionButton(key, value);
             themeSettings.jsonColors = JSON.stringify(colorsObj);
         } catch (e) { console.log("Erreur application: " + e); }
     }
@@ -248,19 +273,20 @@ Item {
         return positionPluginRoot.defaultColors[key];
     }
 
-    // --- INTERFACE ---
-    Popup {
+    // --- 4. INTERFACE UTILISATEUR ---
+
+    // Dialogue (Structure améliorée avec Onglets du Code 2)
+    Dialog {
         id: positionColorDialog
         modal: true
         visible: false
         parent: positionPluginRoot.mainWindow.contentItem
-        anchors.centerIn: parent
-        
+        anchors.centerIn: parent 
         width: Math.min(500, parent.width * 0.95)
-        height: Math.min(mainLayout.implicitHeight + 40, parent.height * 0.9)
-
+        
+        // Background du Code 1 conservé (c'est le même style)
         background: Rectangle {
-            color: Theme.mainBackgroundColor
+            color: Theme.mainBackgroundColor 
             radius: 8
             border.color: Theme.mainColor
             border.width: 2
@@ -270,19 +296,21 @@ Item {
             id: mainLayout
             spacing: 0
             
+            // Titre
             Label {
                 text: positionPluginRoot.tr("pos_tint")
                 font.bold: true; font.pixelSize: 18
                 color: Theme.mainTextColor 
                 Layout.alignment: Qt.AlignHCenter
-                Layout.topMargin: 5
+                Layout.topMargin: 2
                 Layout.bottomMargin: 5
             }
 
+            // Onglets (Nouveauté Code 2)
             TabBar {
                 id: bar
                 Layout.fillWidth: true
-                Layout.bottomMargin: 20
+                Layout.bottomMargin: 10
                 TabButton { text: positionPluginRoot.tr("tab_pos") }
                 TabButton { text: positionPluginRoot.tr("tab_cross") }
             }
@@ -291,11 +319,14 @@ Item {
                 id: stack
                 currentIndex: bar.currentIndex
                 Layout.fillWidth: true
+                // Hauteur dynamique selon l'onglet
                 Layout.preferredHeight: bar.currentIndex === 0 ? colPos.implicitHeight : colCross.implicitHeight
                 
-                // ONGLET 1 : POSITION
+                // --- ONGLET 1 : POSITION ---
                 Item {
-                    implicitHeight: scrollColumnPos.implicitHeight 
+                    // Contraint la hauteur pour le scroll
+                    implicitHeight: Math.min(colPos.implicitHeight, positionPluginRoot.mainWindow.height * 0.6)
+                    
                     ScrollView {
                         anchors.fill: parent
                         clip: true
@@ -306,10 +337,12 @@ Item {
                             id: colPos
                             width: parent.width
                             spacing: 15 
+                            // Couleurs
                             GridLayout {
                                 Layout.fillWidth: true; columns: 2; columnSpacing: 10; rowSpacing: 10
                                 Repeater { model: positionPluginRoot.posColorKeys; delegate: colorDelegate }
                             }
+                            // Sliders
                             ColumnLayout {
                                 Layout.fillWidth: true; spacing: 8 
                                 Repeater { model: positionPluginRoot.posSliderKeys; delegate: sliderDelegate }
@@ -318,9 +351,10 @@ Item {
                     }
                 }
 
-                // ONGLET 2 : VISEUR
+                // --- ONGLET 2 : VISEUR (CROSSHAIR) ---
                 Item {
-                    implicitHeight: scrollColumnCross.implicitHeight 
+                    implicitHeight: Math.min(colCross.implicitHeight, positionPluginRoot.mainWindow.height * 0.6)
+                    
                     ScrollView {
                         anchors.fill: parent
                         clip: true
@@ -331,10 +365,12 @@ Item {
                             id: colCross 
                             width: parent.width
                             spacing: 15 
+                            // Couleurs
                             GridLayout {
                                 Layout.fillWidth: true; columns: 2; columnSpacing: 10; rowSpacing: 10
                                 Repeater { model: positionPluginRoot.crossColorKeys; delegate: colorDelegate }
                             }
+                            // Sliders
                             ColumnLayout {
                                 Layout.fillWidth: true; spacing: 8 
                                 Repeater { model: positionPluginRoot.crossSliderKeys; delegate: sliderDelegate }
@@ -344,11 +380,12 @@ Item {
                 }
             }
 
-            // Footer
+            // Boutons Bas
             RowLayout {
                 Layout.fillWidth: true; Layout.alignment: Qt.AlignHCenter
-                Layout.topMargin: 0; 
-                Layout.bottomMargin: 5; spacing: 20
+                Layout.topMargin: 10    
+                Layout.bottomMargin: 2 
+                spacing: 20
                 Button {
                     text: positionPluginRoot.tr("reset")
                     onClicked: {
@@ -357,6 +394,7 @@ Item {
                         var keys = Object.keys(positionPluginRoot.defaultColors);
                         for(var i=0; i<keys.length; i++) {
                             positionPluginRoot.updateLiveMarker(keys[i], positionPluginRoot.defaultColors[keys[i]]);
+                            positionPluginRoot.updatePositionButton(keys[i], positionPluginRoot.defaultColors[keys[i]]);
                             positionPluginRoot.updateCrosshair(keys[i], positionPluginRoot.defaultColors[keys[i]]);
                         }
                     }
@@ -370,7 +408,8 @@ Item {
         }
     }
 
-    // --- COMPOSANTS ---
+    // --- 5. COMPOSANTS RÉUTILISABLES (Code 2 clean) ---
+    
     Component {
         id: colorDelegate
         Rectangle {
@@ -397,8 +436,7 @@ Item {
                 }
                 Button {
                     display: AbstractButton.IconOnly
-                    // L'ICONE EST RESTAURÉE ICI
-                    icon.source: "palette_icon.svg"
+                    icon.source: "palette_icon.svg" // Assurez-vous d'avoir cette icône ou remettez celle par défaut
                     icon.color: Theme.mainTextColor
                     icon.width: 24; icon.height: 24
                     Layout.preferredWidth: 40; Layout.preferredHeight: 40
@@ -410,6 +448,7 @@ Item {
                 id: colorPicker
                 title: conf.name
                 selectedColor: val 
+                options: ColorDialog.ShowAlphaChannel
                 onAccepted: positionPluginRoot.applyChange(key, "" + selectedColor)
             }
         }
@@ -454,10 +493,15 @@ Item {
         }
     }
 
+    // --- 6. INITIALISATION (Code 1 conservé) ---
+    Component.onCompleted: {
+        // Suppression de iface.addItemToPluginsToolbar()
+        loadTimer.start();
+    }
+    
     Timer {
         id: loadTimer
         interval: 1000
-        running: true
         onTriggered: {
             try {
                 var c = JSON.parse(themeSettings.jsonColors || "{}");
@@ -466,9 +510,11 @@ Item {
                     Theme.applyColors(c);
                     for (var i = 0; i < keys.length; i++) {
                         positionPluginRoot.updateLiveMarker(keys[i], c[keys[i]]);
+                        positionPluginRoot.updatePositionButton(keys[i], c[keys[i]]);
                         positionPluginRoot.updateCrosshair(keys[i], c[keys[i]]);
                     }
                 } else {
+                    // Application des défauts pour le Crosshair si aucune config n'existe
                     var defKeys = Object.keys(positionPluginRoot.defaultColors);
                     for (var j = 0; j < defKeys.length; j++) {
                        if (defKeys[j].indexOf("crosshair") !== -1)
