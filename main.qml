@@ -121,6 +121,11 @@ Item {
         parent: mainLauncher.mainWindow.contentItem
         anchors.centerIn: parent
         width: Math.min(300, parent.width * 0.8)
+        height: {
+        let isLandscape = parent.width > parent.height
+        let maxHeight = parent.height * (isLandscape ? 0.95 : 0.95)
+        return Math.min(implicitHeight, maxHeight)
+        }
         
         background: Rectangle {
             color: Theme.mainBackgroundColor
@@ -129,9 +134,14 @@ Item {
             border.width: 2
         }
 
-        contentItem: ColumnLayout {
-            spacing: 15
-            Layout.margins: 15 
+        contentItem: ScrollView {
+    clip: true
+    contentWidth: availableWidth
+
+    ColumnLayout {
+        width: parent.width
+        spacing: 12
+        Layout.margins: 15
 
             Label {
                 text: tr("Plugin Box")
@@ -223,6 +233,7 @@ Item {
             }
         }
     }
+ }
 
     Component.onCompleted: {
         iface.addItemToPluginsToolbar(launcherBtn);
