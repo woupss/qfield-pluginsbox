@@ -1,7 +1,7 @@
 [general]
-name=PluginsBox
-description= One plugin for many plugins
+name=DriveMe
+description=QField drive you with OSRM
 author=woupss
 icon=icon.svg
-version=0.9
-homepage=https://github.com/woupss/qfield-pluginsbox
+version=0.3
+homepage=https://github.com/woupss/qfield-DriveMe
