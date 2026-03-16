@@ -477,14 +477,26 @@ Item {
                         gpsMapTransformer.sourcePosition = GeometryUtils.centroid(gpsGeom)
                         let proj = gpsMapTransformer.projectedPosition
                         if (proj && (proj.x !== 0 || proj.y !== 0)) {
-                            let ext = mapCanvas.mapSettings.extent
-                            let hw = ext.width / 2
-                            let hh = ext.height / 2
-                            ext.xMinimum = proj.x - hw
-                            ext.xMaximum = proj.x + hw
-                            ext.yMinimum = proj.y - hh
-                            ext.yMaximum = proj.y + hh
-                            mapCanvas.mapSettings.setExtent(ext, true)
+                            // Étendue actuelle = bounding box des entités filtrées (après performZoom)
+                            let featExt = mapCanvas.mapSettings.extent
+                            // Distance max entre le GPS et chaque bord de l'étendue des entités
+                            let dx = Math.max(Math.abs(proj.x - featExt.xMinimum), Math.abs(proj.x - featExt.xMaximum))
+                            let dy = Math.max(Math.abs(proj.y - featExt.yMinimum), Math.abs(proj.y - featExt.yMaximum))
+                            // Marge 10%
+                            dx = dx * 1.1
+                            dy = dy * 1.1
+                            // Centrer sur GPS avec rayon suffisant pour inclure toutes les entités
+                            let screenRatio = featExt.width / (featExt.height > 0 ? featExt.height : 1)
+                            if (dx / dy > screenRatio) {
+                                dy = dx / screenRatio
+                            } else {
+                                dx = dy * screenRatio
+                            }
+                            featExt.xMinimum = proj.x - dx
+                            featExt.xMaximum = proj.x + dx
+                            featExt.yMinimum = proj.y - dy
+                            featExt.yMaximum = proj.y + dy
+                            mapCanvas.mapSettings.setExtent(featExt, true)
                         }
                     }
                 }
