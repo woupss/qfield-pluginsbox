@@ -25,12 +25,12 @@ Item {
         var dictionary = {
             // Titres et labels
             "Plugin Box": "Boîte à plugins",
-            "Tip: Long press on plugin icon to delete all filters\n or long press on FILTERS button": "Astuce : Appui long sur l'icône du plugin\npour supprimer tous les filtres\nou restez appuyez sur le bouton FILTRES",
+            "Tip: Long press on plugin icon to delete all filters\n or long press on FILTERS button": "Astuce : Appui long sur l'icône du plugin\npour supprimer tous les filtres\nou restez appuyer sur le bouton FILTRES",
             
             // Boutons (avec Emojis)
             "FILTERS": "🔍 FILTRES",
             "Customize Position": "🎨 Personnaliser Position",
-            "Update .qgz": "🔄 Mise à jour .qgz",
+            "Github Downloader": "🔄 Gérer votre projet Github",
             "Manage Plugins": "🛠️ Gérer les Plugins", // NOUVEAU LIBELLE
             
             // Messages Toast
@@ -42,7 +42,7 @@ Item {
         // Fallback Anglais
         if (text === "FILTERS") return "🔍 FILTERS"
         if (text === "Customize Position") return "🎨 Customize Position"
-        if (text === "Update .qgz") return "🔄 Update .qgz"
+        if (text === "Github Downloader") return "🔄 Github Downloader"
         if (text === "Manage Plugins") return "🛠️ Manage Plugins"
         
         return text 
@@ -63,10 +63,12 @@ Item {
     PluginUpdateTool {
         id: pluginUpdateTool
     }
-
-    UpdateTool {
-        id: updateTool
-    }
+    GithubDownloader {
+        id: ghDownloader
+   }
+   // UpdateTool //{
+        //id: updateTool
+    //}
 
     // -----------------------------------------------------------
     // 2. LOGIQUE DU LONG PRESS (TIMER)
@@ -184,7 +186,7 @@ Item {
             
             // --- BOUTON 3 : MISE A JOUR PROJET ---
             Button {
-                text: tr("Update .qgz")
+                text: tr("Github Downloader")
                 Layout.fillWidth: true
                 Layout.preferredHeight: 50
                 font.bold: true
@@ -197,11 +199,11 @@ Item {
                 }
                 onClicked: {
                     launcherDialog.close()
-                    updateTool.openUpdateUI()
+                    ghDownloader.openUI()
                 }
             }
 
-            // --- BOUTON 4 : MISE A JOUR DES PLUGINS (Remplacement) ---
+            // --- BOUTON 4 : MISE A JOUR DES PLUGINS
             Button {
                 text: tr("Manage Plugins")
                 Layout.fillWidth: true
