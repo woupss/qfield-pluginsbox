@@ -204,24 +204,24 @@ Item {
             }
 
             // --- BOUTON 4 : MISE A JOUR DES PLUGINS
-            Button {
-                text: tr("Manage Plugins")
-                Layout.fillWidth: true
-                Layout.preferredHeight: 50
-                font.bold: true
-                contentItem: Text { 
-                    text: parent.text
-                    color: "#D32F2F" // Conserve le rouge pour le style
-                    font: parent.font
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-                onClicked: {
-                    launcherDialog.close()
+       //     Button {
+        //        text: tr("Manage Plugins")
+       //         Layout.fillWidth: true
+       //         Layout.preferredHeight: 50
+       //         font.bold: true
+       //         contentItem: Text { 
+       //             text: parent.text
+        //            color: "#D32F2F" // Conserve le rouge pour le style
+         //           font: parent.font
+             //       horizontalAlignment: Text.AlignHCenter
+           //         verticalAlignment: Text.AlignVCenter
+        //        }
+         //       onClicked: {
+         //           launcherDialog.close()
                     // Appel de la nouvelle fonction du plugin annexe
-                    pluginUpdateTool.openPluginUpdateUI()
-                }
-            }
+                    //pluginUpdateTool.openPluginUpdateUI()
+          //      }
+          //  }
             
             // Petit texte d'aide
             Label {
