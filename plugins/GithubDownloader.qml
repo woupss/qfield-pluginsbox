@@ -1286,7 +1286,7 @@ Item {
         leftPadding:   0; rightPadding:  0
 
         background: Rectangle {
-            color: "white"; border.color: Theme.mainColor; border.width: 2; radius: 8
+            color: "white"; border.color: Theme.mainColor; border.width: 2; radius: 18
         }
 
         contentItem: Flickable {

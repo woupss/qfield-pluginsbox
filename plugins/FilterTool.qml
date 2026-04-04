@@ -931,7 +931,7 @@ Item {
         width: Math.min(mainWindow.width * 0.9, 450)
         x: (mainWindow.width - width) / 2
         y: isLandscape ? (mainWindow.height - height) / 2 : (mainWindow.height - height) / 2 -65
-        background: Rectangle { color: "white"; border.color: Theme.mainColor; border.width: 2; radius: 8 }
+        background: Rectangle { color: "white"; border.color: Theme.mainColor; border.width: 2; radius: 15 }
 
         property bool isLandscape: mainWindow.width > mainWindow.height
         property real scaleFactor: isLandscape
