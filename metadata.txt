@@ -1,7 +1,7 @@
 [general]
-name=Theme Position color
-description=Change the color of the position icon
+name=PluginsBox
+description= One plugin for many plugins
 author=woupss
 icon=icon.svg
-version=0.5
-homepage=https://github.com/woupss/qfield-theme-position-color
+version=1.5
+homepage=https://github.com/woupss/qfield-pluginsbox
