@@ -91,6 +91,7 @@ Item {
     property bool   upIsWorking:          false
     property bool   upIsFinished:         false
     property bool   upIsSelfUpdate:       false
+    property string upInstalledUuid:      ""
     property bool   upUpdatesChecked:     false
     property var    upPluginsQueue:       []
     property string upUpdatesResultText:  ""
@@ -160,6 +161,7 @@ Item {
             LBL_BRANCH:       "Branche :",
             PH_BRANCH:        "main",
             LBL_FOLDER:       "Nom du dossier de votre projet :",
+            LBL_FOLDER_PLUGIN:"Nom du dossier du plugin :",
             PH_FOLDER:        "MonProjet",
             CB_TOKEN:         "Token GitHub (dépôt privé / fichiers LFS volumineux)",
             PH_TOKEN:         "ghp_xxxxxxxxxxxx...",
@@ -181,6 +183,7 @@ Item {
             STATUS_DL:        "Téléchargement",
             STATUS_DONE:      "✅  Téléchargement terminé !",
             INFO_DONE:        "Le projet est prêt. Cliquez sur « Ouvrir le projet ».",
+            INFO_DONE_PLUGIN: "Le plugin est prêt. Vous pouvez l'activer depuis les paramètres.",
             ERR_FIELDS:       "Remplissez : auteur, dépôt et dossier de destination.",
             ERR_404:          "Dépôt introuvable (404). Vérifiez l'auteur et le nom.",
             ERR_401:          "Accès refusé (401). Dépôt privé — utilisez un token.",
@@ -206,6 +209,7 @@ Item {
             LBL_BRANCH:       "Branch:",
             PH_BRANCH:        "main",
             LBL_FOLDER:       "Folder name of your project :",
+            LBL_FOLDER_PLUGIN:"Plugin folder name:",
             PH_FOLDER:        "MyProject",
             CB_TOKEN:         "GitHub Token (private repo / LFS large files)",
             PH_TOKEN:         "ghp_xxxxxxxxxxxx...",
@@ -227,6 +231,7 @@ Item {
             STATUS_DL:        "Downloading",
             STATUS_DONE:      "✅  Download complete!",
             INFO_DONE:        "Project ready. Click 'Open project'.",
+            INFO_DONE_PLUGIN: "Plugin ready. You can enable it from the settings.",
             ERR_FIELDS:       "Please fill in: author, repository and destination folder.",
             ERR_404:          "Repository not found (404). Check author and repo name.",
             ERR_401:          "Access denied (401). Private repo — use a GitHub token.",
@@ -283,7 +288,10 @@ Item {
         "error":              { "en": "❌ Error: ",                    "fr": "❌ Erreur : " },
         "installed":          { "en": "✔ Installed",                   "fr": "✔ Installé" },
         "restart":            { "en": "\nRestart recommended.",        "fr": "\nRedémarrage recommandé." },
-        "Refresh the list of plugins to update":       { "en": "🔄  Refresh the list of plugins to update",          "fr": "🔄  Actualiser la liste des plugin à mettre à jour" }
+        "Refresh the list of plugins to update":       { "en": "🔄  Refresh the list of plugins to update",          "fr": "🔄  Actualiser la liste des plugin à mettre à jour" },
+        "plugin_updated":  { "en": "The plugin has been updated.", "fr": "Le plugin a été mis à jour." },
+        "btn_reload":      { "en": "🔄  Reload plugin",            "fr": "🔄  Recharger le plugin" },
+        "toast_reloading": { "en": "Reloading plugin...",          "fr": "Rechargement du plugin..." } 
     })
 
     function upTr(key) {
@@ -301,14 +309,14 @@ Item {
         iface.addItemToPluginsToolbar(toolBtn)
     }
 
-   // QfToolButton {
-    //    id: toolBtn
-    //    iconSource: 'icon.png'
-     //   iconColor: Theme.mainColor
-     //   bgcolor: Theme.darkGray
-     //   round: true
-     //   onClicked: ghDownloader.openUI()
-   // }
+  //  QfToolButton {
+   //     id: toolBtn
+  //      iconSource: 'icon.svg'
+   //     iconColor: Theme.mainColor
+   //     bgcolor: Theme.darkGray
+   //     round: true
+   //     onClicked: ghDownloader.openUI()
+  //  }
 
     function getOwner()  { return ownerCombo.editText.trim() }
     function getRepo()   {
@@ -376,9 +384,21 @@ Item {
                 return root.substring(0, markerIdx) + markers[m] + folder
             }
         }
+        var androidIdx = root.indexOf("/Android/data/")
+        if (androidIdx >= 0) {
+            var filesIdx = root.indexOf("/files/", androidIdx)
+            if (filesIdx >= 0) {
+                var androidBase = root.substring(0, filesIdx + 7)
+                if (destMode === "plugin")
+                    return androidBase + "QField/plugins/" + folder
+                return androidBase + "Imported Projects/" + folder
+            }
+        }
+        var parentIdx = root.lastIndexOf("/")
+        var parentPath = (parentIdx > 0) ? root.substring(0, parentIdx) : root
         if (destMode === "plugin")
-            return "/storage/emulated/0/Android/data/ch.opengis.qfield_dev/files/QField/plugins/" + folder
-        return "/storage/emulated/0/Android/data/ch.opengis.qfield_dev/files/Imported Projects/" + folder
+            return parentPath + "/QField/plugins/" + folder
+        return parentPath + "/Imported Projects/" + folder
     }
 
     function buildDestPath(subFolder, fileName) {
@@ -479,6 +499,33 @@ Item {
                 var fname     = parts[parts.length - 1]
                 var subfolder = (parts.length > 1) ? parts.slice(0, parts.length - 1).join("/") : ""
                 blobs.push({ path: item.path, folder: subfolder, filename: fname, size: item.size || 0 })
+            }
+        }
+        // Détection du dossier racine du plugin (ex: repo/plugin-name/main.qml → strip le préfixe)
+        // folder = chemin repo original (affiché dans l'arbre)
+        // destFolder = chemin de destination réel (utilisé pour le téléchargement)
+        var pluginRoot = ""
+        if (destMode === "plugin") {
+            for (var pi = 0; pi < blobs.length; pi++) {
+                if (blobs[pi].filename === "main.qml"
+                        && blobs[pi].folder !== ""
+                        && blobs[pi].folder.indexOf("/") === -1) {
+                    pluginRoot = blobs[pi].folder
+                    break
+                }
+            }
+        }
+        for (var pk = 0; pk < blobs.length; pk++) {
+            var orig = blobs[pk].folder
+            if (pluginRoot !== "") {
+                if (orig === pluginRoot)
+                    blobs[pk].destFolder = ""
+                else if (orig.indexOf(pluginRoot + "/") === 0)
+                    blobs[pk].destFolder = orig.substring(pluginRoot.length + 1)
+                else
+                    blobs[pk].destFolder = orig
+            } else {
+                blobs[pk].destFolder = orig
             }
         }
         fileTree    = blobs
@@ -637,10 +684,10 @@ Item {
         statusText.text  = tr("STATUS_DL") + " " + info
         statusText.color = Theme.mainColor
         infoText.text    = item.path
-        var destPath = buildDestPath(item.folder, item.filename)
+        var destPath = buildDestPath(item.destFolder, item.filename)
         var dlUrl    = buildDownloadUrl(item.path)
         var tkn      = getToken()
-        ensureDir(item.folder)
+        ensureDir(item.destFolder)
         downloadSmartFile(dlUrl, destPath, tkn, function() {
             processedFiles++
             downloadQueue.shift()
@@ -807,7 +854,7 @@ Item {
         pluginState      = "done"
         statusText.text  = tr("STATUS_DONE")
         statusText.color = "#80cc28"
-        infoText.text    = tr("INFO_DONE")
+        infoText.text    = (destMode === "plugin") ? tr("INFO_DONE_PLUGIN") : tr("INFO_DONE")
     }
 
     function findRootProjectFile() {
@@ -1118,6 +1165,14 @@ Item {
         } else { upStatusText.text = upTr("select_warn"); upStatusText.color = "red"; upIsWorking = false }
     }
 
+    function reloadInstalledPlugin(uuid) {
+        if (!uuid || uuid === "") return
+        if (pluginManager.isAppPluginEnabled(uuid))
+            pluginManager.disableAppPlugin(uuid)
+        pluginManager.enableAppPlugin(uuid)
+        mainWindow.displayToast(upTr("toast_reloading"))
+    }
+
     function executeInstallation(finalUrl) {
         upFinalDownloadUrl = finalUrl
         installTimer.start()
@@ -1166,11 +1221,13 @@ Item {
             if (error && error !== "") { upStatusText.text = upTr("error") + error; upStatusText.color = "red" }
             else {
                 upIsFinished = true
-                var successMsg = upTr("installed")
+                upInstalledUuid = uuid !== "" ? uuid : upTargetUuid
+                var successMsg = upTr("plugin_updated")
                 if (upDetectedVersion !== "") successMsg += " " + upDetectedVersion
                 upStatusText.text  = successMsg
                 upStatusText.color = "green"
                 if (pluginManager.pluginModel) pluginManager.pluginModel.refresh(false)
+                reloadInstalledPlugin(upInstalledUuid)
             }
         }
     }
@@ -1286,7 +1343,7 @@ Item {
         leftPadding:   0; rightPadding:  0
 
         background: Rectangle {
-            color: "white"; border.color: Theme.mainColor; border.width: 2; radius: 18
+            color: "white"; border.color: Theme.mainColor; border.width: 2; radius: 8
         }
 
         contentItem: Flickable {
@@ -1449,7 +1506,7 @@ Item {
                     }
                 }
 
-                // ═══════════════════════════════════════════════════════════
+                // ════════════════════════════════════════════════���══════════
                 // SECTION FORMULAIRE INSTALL — Projet  OU  Plugin > Installer
                 // Masquée quand Plugin > Mettre à jour est actif
                 // ═══════════════════════════════════════════════════════════
@@ -1677,7 +1734,7 @@ Item {
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 1
-                        Text { text: tr("LBL_FOLDER"); color: "#666"; font.pixelSize: 11 }
+                        Text { text: destMode === "plugin" ? tr("LBL_FOLDER_PLUGIN") : tr("LBL_FOLDER"); color: "#666"; font.pixelSize: 11 }
                         MarqueeTextField {
                             id: folderInput
                             placeholderText: tr("PH_FOLDER")
@@ -1741,7 +1798,7 @@ Item {
 
                 // ═══════════════════════════════════════════════════════════
                 // RÉSULTATS EXPLORATION (partagé Projet et mode Install Plugin)
-                // ═══════════════════════════════════════════════════════════
+                // ═════════════════════════════��═════════════════════════════
 
                 ColumnLayout {
                     visible: pluginState === "ready" || pluginState === "downloading" || pluginState === "done"
@@ -2199,12 +2256,26 @@ downloadDialog.close() }
                     enabled: !upIsWorking && (pluginCombo.currentIndex !== -1 || urlField.text !== "")
                     background: Rectangle { color: parent.enabled ? Theme.mainColor : "#bdc3c7"; radius: 4 }
                     contentItem: Text {
-                        text: upIsWorking ? upTr("btn_wait") : (upPreparedUrl !== "" ? upTr("btn_install") : upTr("btn_update"))
+                        text: upIsWorking ? upTr("btn_wait") : (upInstalledVersion !== "" ? upTr("btn_update") : upTr("btn_install"))
                         color: "white"; font.bold: true; font.pixelSize: 14
                         horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
                     }
                     onClicked: startProcess()
                 }
+                Button {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.bottomMargin: 8
+                    leftPadding: 20; rightPadding: 20
+                    visible: upIsFinished && upInstalledUuid !== ""
+                    background: Rectangle { color: "#2980b9"; radius: 4 }
+                    contentItem: Text {
+                        text: upTr("btn_reload")
+                        color: "white"; font.bold: true; font.pixelSize: 14
+                        horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                    }
+                    onClicked: reloadInstalledPlugin(upInstalledUuid)
+                }
+
 
                 } // ── fin updateSection ────────────────────────────────────
 
