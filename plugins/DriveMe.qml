@@ -59,7 +59,7 @@ Item {
         property string carColor: "#FF00FF"
         property string footColor:  "#02AE0F" // "#FF9500"
         property string parkColor:   "#00FF00"
-        property string targetColor: "##00FCF7"
+        property string targetColor: "#00FCF7"
         property string targetgeomColor: "cyan"
     }
 
@@ -146,12 +146,12 @@ QFieldItems.GeometryRenderer {
 }
 
     QFieldItems.GeometryRenderer {
-        id: onRouteRenderer
+        id: onRouteRenderer //point clignotant cyan sur la route
         parent: mapCanvas
         mapSettings: mapCanvas.mapSettings
         geometryWrapper.crs: CoordinateReferenceSystemUtils.wgs84Crs()
         lineWidth: 4
-        color: navColorSettings.targetColor
+        color: "yellow" //navColorSettings.targetColor
         opacity: 1.0
         SequentialAnimation on opacity {
             loops: Animation.Infinite
@@ -218,12 +218,12 @@ QFieldItems.GeometryRenderer {
     }
 
     QFieldItems.GeometryRenderer {
-        id: polygonCenterRenderer
+        id: polygonCenterRenderer // clignotement geometrie cible
         parent: mapCanvas
         mapSettings: mapCanvas.mapSettings
         geometryWrapper.crs: CoordinateReferenceSystemUtils.wgs84Crs()
         lineWidth: 4
-        color: "cyan" // Fuschia — centre du polygone lié à la cible rouge courante
+        color: "yellow" // couleur du polygone lié à la cible rouge courante
         opacity: 1.0
         SequentialAnimation on opacity {
             loops: Animation.Infinite
